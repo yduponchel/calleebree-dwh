@@ -227,10 +227,18 @@ $$ language sql;
 -- Miscellaneous Utilities
 -- --------------------------------------------------------------------------------
 
+-- drop function if exists dashboards.utils_division cascade;
+create or replace function dashboards.utils_division(_numerator_ numeric, _denominator_ numeric) returns numeric as $$ -- Returns the time difference in seconds
+	select case
+		when coalesce(_denominator_, 0.0) = 0.0 then null
+		else _numerator_ / _denominator_ end;
+$$ language sql;
+
+-- --------------------------------------------------------------------------------
 -- drop function if exists dashboards.utils_ratio cascade;
 create or replace function dashboards.utils_ratio(_numerator_ numeric, _denominator_ numeric, _precision_ int) returns numeric as $$ -- Returns the time difference in seconds
 	select case
-		when _denominator_ is null then null
+		when coalesce(_denominator_, 0.0) = 0.0 then null
 		else round(_numerator_ / _denominator_, _precision_) end;
 $$ language sql;
 

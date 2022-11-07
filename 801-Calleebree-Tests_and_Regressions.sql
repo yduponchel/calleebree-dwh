@@ -145,10 +145,12 @@ select dashboards.utils_format_year(current_date);
 select dashboards.utils_ratio(2736, 100, 2);
 select dashboards.utils_ratio(2736, 100, 1);
 select dashboards.utils_ratio(2736, 100, 0);
+select dashboards.utils_ratio(2736, 0, 0);
 
 select dashboards.utils_percent(2736, 10000, 2);
 select dashboards.utils_percent(2736, 10000, 1);
 select dashboards.utils_percent(2736, 10000, 0);
+select dashboards.utils_percent(2736, 0, 0);
 
 -- --------------------------------------------------------------------------------
 

@@ -30,6 +30,14 @@
 -- select * from dashboards.trends_quality('campaign', true, 'month'); 						-- _level_ in ('global', 'sponsor', 'brand', 'partner', 'team', 'agent', 'campaign', 'file')
 
 
+select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'last 6 weeks'); 
+
+select * from dashboards.trends_quality('campaign', true, 'month');
+
+-- TODO FIXME: all volumes seems to be multiplied by X where X is a multiple of 10 (smallest number is 20, all numbers are "round")
+-- TODO FIXME: check volumes with sub-query
+-- TODO FIXME: index quality seems weird, most likely not surprising if volumes are incorrect
+
 drop function if exists dashboards.trends_quality cascade;
 create or replace function dashboards.trends_quality(_level_ text, _campaign_breakdown_ boolean, _interval_ text) 
 --
@@ -63,12 +71,14 @@ returns table (
 	total_productive_hours numeric,
 	percent_calls_handled numeric, percent_calls_argumented numeric, percent_calls_engaged numeric, percent_calls_converted numeric,
 	index_quality_calls_handled numeric, index_quality_calls_argumented numeric, index_quality_calls_engaged numeric, index_quality_calls_converted numeric,
-	confidence numeric
+	confidence double precision,
+	check_proxy bigint, check_reference bigint
 	) as $$
 declare
-	_confidence_reference_ numeric := 100.0;
-	_hours_threshold_ numeric := 0.2;
-	_calls_threshold_ numeric := 50.0
+	_confidence_threshold_ double precision := 100.0; 			-- confidence = sum(calls) / confidence_reference
+	_pi_ double precision := 3.14159;
+	_hours_threshold_ numeric := 0.2; 					-- min number of dialing hours to include the data point in the calculations
+	_calls_threshold_ numeric := 50.0					-- min number of calls to include the data point in the calculations
 		* case 
 			when _interval_ = 'month' then 2.0
 			when _interval_ = 'week' then 1.0
@@ -131,14 +141,14 @@ begin
 		case when _result_team_ then proxy.team_name else null end as team_name, 
 		case when _result_agent_ then proxy.agent_name else null end as agent_name,
 		case when _result_campaign_ then proxy.campaign_name else null end as campaign_name, 
-		case when _result_file_ then proxy.file_name else null end as campaign_name, 
+		case when _result_file_ then proxy.file_name else null end as file_name, 
 		-- --------------------------------------------------------------------------------
 		-- Call volumes
-		sum(proxy.total_calls) as total_calls,
-		sum(proxy.total_calls_handled) as total_calls_handled,
-		sum(proxy.total_calls_argumented) as total_calls_argumented,
-		sum(proxy.total_calls_engaged) as total_calls_engaged,
-		sum(proxy.total_calls_converted) as total_calls_converted,
+		sum(proxy.total_calls)::bigint as total_calls,
+		sum(proxy.total_calls_handled)::bigint as total_calls_handled,
+		sum(proxy.total_calls_argumented)::bigint as total_calls_argumented,
+		sum(proxy.total_calls_engaged)::bigint as total_calls_engaged,
+		sum(proxy.total_calls_converted)::bigint as total_calls_converted,
 		-- Other Volumes
 		sum(proxy.total_productive_hours) as total_productive_hours,
 		-- Efficency KPIs
@@ -150,42 +160,42 @@ begin
 		-- Quality KPIs
 		dashboards.utils_ratio(
 			100.0 * sum(
-				proxy.total_calls_handled
-				* reference.total_calls
-				/ reference.total_calls_handled), 
+				dashboards.utils_division(
+					proxy.total_calls_handled
+						* reference.total_calls,
+					reference.total_calls_handled)), 
 			sum(proxy.total_calls),
 			1) as index_quality_calls_handled,
 		dashboards.utils_ratio(
 			100.0 * sum(
-				proxy.total_calls_argumented
-				* reference.total_calls_handled
-				/ reference.total_calls_argumented), 
+				dashboards.utils_division(
+					proxy.total_calls_argumented
+						* reference.total_calls_handled,
+					reference.total_calls_argumented)), 
 			sum(proxy.total_calls_handled),
 			1) as index_quality_calls_argumented,
 		dashboards.utils_ratio(
 			100.0 * sum(
-				proxy.total_calls_engaged
-				* reference.total_calls_handled
-				/ reference.total_calls_engaged),
+				dashboards.utils_division(
+					proxy.total_calls_engaged
+						* reference.total_calls_handled,
+					reference.total_calls_engaged)),
 			sum(proxy.total_calls_handled),
 			1) as index_quality_calls_engaged,
 		dashboards.utils_ratio(
 			100.0 * sum(
-				proxy.total_calls_converted
-				* reference.total_calls_handled
-				/ reference.total_calls_converted),
+				dashboards.utils_division(
+					proxy.total_calls_converted
+						* reference.total_calls_handled,
+					reference.total_calls_converted)),
 			sum(proxy.total_calls_handled),
 			1) as index_quality_calls_converted,
-			
-		dashboards.utils_ratio(100.0 * sum(proxy.percent_calls_handled), sum(reference.percent_calls_handled), 1) as index_quality_calls_handled,
-		dashboards.utils_ratio(100.0 * sum(proxy.percent_calls_argumented), sum(reference.percent_calls_argumented), 1) as index_quality_calls_argumented,
-		dashboards.utils_ratio(100.0 * sum(proxy.percent_calls_engaged), sum(reference.percent_calls_engaged), 1) as index_quality_calls_engaged,
-		dashboards.utils_ratio(100.0 * sum(proxy.percent_calls_converted), sum(reference.percent_calls_converted), 1) as index_quality_calls_converted,
 		-- --------------------------------------------------------------------------------
 		-- Other
+		atan(sum(proxy.total_calls_handled) - _confidence_threshold_) / _pi_ * 50.0 + 50.0 as confidence,
+--		sum(proxy.total_calls_handled) / _confidence_threshold_ as confidence -- TODO FIXME: include some more advanced function (ex: some sort of log or arctan function)
 		count(proxy.*) as check_proxy,
-		count(reference.*) as check_reference,
-		proxy.total_calls_handled / _confidence_reference_ as confidence
+		count(reference.*) as check_reference
 		-- --------------------------------------------------------------------------------
 	from proxy as proxy
 	left join reference as reference on 1=1
