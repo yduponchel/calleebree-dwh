@@ -78,7 +78,7 @@ declare
 	_pi_ double precision := 3.14159265359;
 	_confidence_threshold_ double precision := 100.0; 			-- Number of calls to consider the confidence to be "good" 		|| confidence = true <==> sum(calls) >= confidence_threshold
 	_confidence_value_ double precision := 80.0; 				-- Value  within [0..100] that defines confidence as "good"		|| sum(calls) = confidence_threshold ==> confidence = confidence_value
-	_confidence_scale_ double precision := tan(_pi_ / 100.0 * (_confidence_value_ - 50));
+	_confidence_scale_ double precision := tan(_pi_ / 100.0 * (_confidence_value_ - 50)); --									|| -pi/2 < arctan(x) < +pi/2 || y = arctan(x) <==> tan(y) = x || arctan( confidence_threshold ) / pi * 100 + 50 = confidence_value
 	_hours_threshold_ numeric := 0.2; 							-- min number of dialing hours to include the data point in the calculations
 	_calls_threshold_ numeric := 50.0							-- min number of calls to include the data point in the calculations
 		* case 
