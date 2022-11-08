@@ -76,9 +76,10 @@ returns table (
 	) as $$
 declare
 	_pi_ double precision := 3.14159265359;
-	_confidence_threshold_ double precision := 100.0; 			-- Number of calls to consider the confidence to be "good" 		|| confidence = true <==> sum(calls) >= confidence_threshold
-	_confidence_value_ double precision := 80.0; 				-- Value  within [0..100] that defines confidence as "good"		|| sum(calls) = confidence_threshold ==> confidence = confidence_value
-	_confidence_scale_ double precision := tan(_pi_ / 100.0 * (_confidence_value_ - 50)); --									|| -pi/2 < arctan(x) < +pi/2 || y = arctan(x) <==> tan(y) = x || arctan( confidence_threshold ) / pi * 100 + 50 = confidence_value
+	_confidence_calls_threshold_ double precision := 100.0; 			-- Number of calls to consider the confidence to be "good" 		|| confidence is "good"							<==> sum(calls) >= confidence_calls_threshold		<==> confidence >= confidence_value_threshold
+	_confidence_value_threshold_ double precision := 80.0; 				-- Value  within [0..100] that defines confidence as "good"		|| sum(calls) = confidence_calls_threshold 		==> confidence = confidence_value_threshold
+	_confidence_calls_middle double precision := 65.0;					-- Number of calls to reach a confidence of "50"				|| sum(calls) = confidence_middle 				==> confidence = 50
+	_confidence_scale_ double precision := (_confidence_value_threshold_ - _confidence_calls_middle) / tan((_confidence_value_threshold_ - 50) * _pi_ / 100.0); --									|| -pi/2 < arctan(x) < +pi/2 || y = arctan(x) 	<==> tan(y) = x 		|| arctan( ( confidence_calls_threshold - confidence_calls_middle) / confidence_scale ) / pi * 100 + 50 = confidence_value_threshold
 	_hours_threshold_ numeric := 0.2; 							-- min number of dialing hours to include the data point in the calculations
 	_calls_threshold_ numeric := 50.0							-- min number of calls to include the data point in the calculations
 		* case 
@@ -194,17 +195,18 @@ begin
 			1) as index_quality_calls_converted,
 		-- --------------------------------------------------------------------------------
 		-- Other
-		atan(sum(proxy.total_calls_handled) / _confidence_threshold_ * _confidence_scale_) / _pi_ * 50.0 + 50.0 as confidence,
+		atan(sum(proxy.total_calls_handled) / _confidence_calls_threshold_ * _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence,
 		count(proxy.*) as check_proxy,
 		count(reference.*) as check_reference
 		-- --------------------------------------------------------------------------------
 	from proxy as proxy
 	left join reference as reference on 1=1
-		and (proxy.month = reference.month or proxy.week = reference.week or proxy.date= reference.date or proxy.custom_interval = reference.custom_interval) 
-		and case when _reference_brand_ then proxy.sponsor_id = reference.sponsor_id and proxy.brand_id = reference.brand_id else reference.sponsor_id is null and reference.brand_id is null end 
-		and case when _reference_campaign_ then proxy.campaign_name = reference.campaign_name else reference.campaign_name is null end
---		and case when _reference_brand_ then proxy.sponsor_id = reference.sponsor_id and proxy.brand_id = resference.brand_id else reference.sponsor_id is null and reference.brand_id is null end 
---		and case when _reference_campaign_ then proxy.campaign_name = reference.campaign_name else reference.campaign_name is null end
+		and coalesce(reference.month, '') = coalesce(proxy.month, '')
+		and coalesce(reference.week, '') = coalesce(proxy.week, '')
+		and coalesce(reference.date, '') = coalesce(proxy.date, '')
+		and coalesce(reference.custom_interval, '') = coalesce(proxy.custom_interval, '')
+		and case when _reference_brand_ then proxy.sponsor_id = reference.sponsor_id and proxy.brand_id = reference.brand_id else true end 
+		and case when _reference_campaign_ then proxy.campaign_name = reference.campaign_name else true end
 	where 1=1
 --		and reference.partner_id is null and reference.team_id is null and reference.user_id is null -- Shall be implicit from definition of "reference" in query
 		and proxy.total_Calling_hours >= _hours_threshold_
