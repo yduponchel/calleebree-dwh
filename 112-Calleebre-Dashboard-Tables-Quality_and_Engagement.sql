@@ -71,7 +71,7 @@ returns table (
 	total_productive_hours numeric,
 	percent_calls_handled numeric, percent_calls_argumented numeric, percent_calls_engaged numeric, percent_calls_converted numeric,
 	index_quality_calls_handled numeric, index_quality_calls_argumented numeric, index_quality_calls_engaged numeric, index_quality_calls_converted numeric,
-	confidence double precision,
+	confidence boolean, confidence_value double precision,
 	check_proxy bigint, check_reference bigint
 	) as $$
 declare
@@ -195,7 +195,8 @@ begin
 			1) as index_quality_calls_converted,
 		-- --------------------------------------------------------------------------------
 		-- Other
-		atan((sum(proxy.total_calls_engaged) - _confidence_calls_middle_) / _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence,
+		_confidence_value_threshold_ <= atan((sum(proxy.total_calls_engaged) - _confidence_calls_middle_) / _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence,
+		atan((sum(proxy.total_calls_engaged) - _confidence_calls_middle_) / _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence_value,
 		count(proxy.*) as check_proxy,
 		count(reference.*) as check_reference
 		-- --------------------------------------------------------------------------------
