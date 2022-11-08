@@ -78,8 +78,8 @@ declare
 	_pi_ double precision := 3.14159265359;
 	_confidence_calls_threshold_ double precision := 100.0; 			-- Number of calls to consider the confidence to be "good" 		|| confidence is "good"							<==> sum(calls) >= confidence_calls_threshold		<==> confidence >= confidence_value_threshold
 	_confidence_value_threshold_ double precision := 80.0; 				-- Value  within [0..100] that defines confidence as "good"		|| sum(calls) = confidence_calls_threshold 		==> confidence = confidence_value_threshold
-	_confidence_calls_middle double precision := 65.0;					-- Number of calls to reach a confidence of "50"				|| sum(calls) = confidence_middle 				==> confidence = 50
-	_confidence_scale_ double precision := (_confidence_value_threshold_ - _confidence_calls_middle) / tan((_confidence_value_threshold_ - 50) * _pi_ / 100.0); --									|| -pi/2 < arctan(x) < +pi/2 || y = arctan(x) 	<==> tan(y) = x 		|| arctan( ( confidence_calls_threshold - confidence_calls_middle) / confidence_scale ) / pi * 100 + 50 = confidence_value_threshold
+	_confidence_calls_middle_ double precision := 65.0;					-- Number of calls to reach a confidence of "50"				|| sum(calls) = confidence_middle 				==> confidence = 50
+	_confidence_scale_ double precision := (_confidence_value_threshold_ - _confidence_calls_middle_) / tan((_confidence_value_threshold_ - 50) * _pi_ / 100.0); --									|| -pi/2 < arctan(x) < +pi/2 || y = arctan(x) 	<==> tan(y) = x 		|| arctan( ( confidence_calls_threshold - confidence_calls_middle) / confidence_scale ) / pi * 100 + 50 = confidence_value_threshold
 	_hours_threshold_ numeric := 0.2; 							-- min number of dialing hours to include the data point in the calculations
 	_calls_threshold_ numeric := 50.0							-- min number of calls to include the data point in the calculations
 		* case 
@@ -195,7 +195,7 @@ begin
 			1) as index_quality_calls_converted,
 		-- --------------------------------------------------------------------------------
 		-- Other
-		atan(sum(proxy.total_calls_handled) / _confidence_calls_threshold_ * _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence,
+		atan((sum(proxy.total_calls_engaged) - _confidence_calls_middle_) / _confidence_scale_) / _pi_ * 100.0 + 50.0 as confidence,
 		count(proxy.*) as check_proxy,
 		count(reference.*) as check_reference
 		-- --------------------------------------------------------------------------------
