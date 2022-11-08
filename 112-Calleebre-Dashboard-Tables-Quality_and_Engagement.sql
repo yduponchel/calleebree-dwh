@@ -75,10 +75,12 @@ returns table (
 	check_proxy bigint, check_reference bigint
 	) as $$
 declare
-	_confidence_threshold_ double precision := 100.0; 			-- confidence = sum(calls) / confidence_reference
-	_pi_ double precision := 3.14159;
-	_hours_threshold_ numeric := 0.2; 					-- min number of dialing hours to include the data point in the calculations
-	_calls_threshold_ numeric := 50.0					-- min number of calls to include the data point in the calculations
+	_pi_ double precision := 3.14159265359;
+	_confidence_threshold_ double precision := 100.0; 			-- Number of calls to consider the confidence to be "good" 		|| confidence = true <==> sum(calls) >= confidence_threshold
+	_confidence_value_ double precision := 80.0; 				-- Value  within [0..100] that defines confidence as "good"		|| sum(calls) = confidence_threshold ==> confidence = confidence_value
+	_confidence_scale_ double precision := tan(_pi_ / 100.0 * (_confidence_value_ - 50));
+	_hours_threshold_ numeric := 0.2; 							-- min number of dialing hours to include the data point in the calculations
+	_calls_threshold_ numeric := 50.0							-- min number of calls to include the data point in the calculations
 		* case 
 			when _interval_ = 'month' then 2.0
 			when _interval_ = 'week' then 1.0
@@ -192,8 +194,7 @@ begin
 			1) as index_quality_calls_converted,
 		-- --------------------------------------------------------------------------------
 		-- Other
-		atan(sum(proxy.total_calls_handled) - _confidence_threshold_) / _pi_ * 50.0 + 50.0 as confidence,
---		sum(proxy.total_calls_handled) / _confidence_threshold_ as confidence -- TODO FIXME: include some more advanced function (ex: some sort of log or arctan function)
+		atan(sum(proxy.total_calls_handled) / _confidence_threshold_ * _confidence_scale_) / _pi_ * 50.0 + 50.0 as confidence,
 		count(proxy.*) as check_proxy,
 		count(reference.*) as check_reference
 		-- --------------------------------------------------------------------------------
