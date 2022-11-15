@@ -30,9 +30,9 @@
 -- select * from dashboards.trends_quality('campaign', true, 'month'); 						-- _level_ in ('global', 'sponsor', 'brand', 'partner', 'team', 'agent', 'campaign', 'file')
 
 
-select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'last 6 weeks'); 
+-- select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'last 6 weeks'); 
 
-select * from dashboards.trends_quality('campaign', true, 'month');
+-- select * from dashboards.trends_quality('campaign', true, 'month');
 
 -- TODO FIXME: all volumes seems to be multiplied by X where X is a multiple of 10 (smallest number is 20, all numbers are "round")
 -- TODO FIXME: check volumes with sub-query

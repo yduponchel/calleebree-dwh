@@ -17,8 +17,8 @@ create or replace function dashboards.utils_campaign_mapping(_campaign_id_ text,
 			when _campaign_name_ ilike '%Contest%' then 'Contest'
 			when _campaign_name_ ilike '%test%' then '!!! TEST'
 --			when _campaign_name_ ilike '%test%' then '!!! TEST: ' || _campaign_name_
-			when _campaign_name_ ilike '%MNP%' then 'MNP'
-			when _campaign_name_ ilike '%Churn%' then 'Churn'
+			when _campaign_name_ ilike '%MNP%' then 'MNP/Churn'
+			when _campaign_name_ ilike '%Churn%' then 'MNP/Churn'
 			when _campaign_name_ ilike '%Fiber%' then 'Fiber'
 			when _campaign_name_ ilike '%Cable%' then 'Fiber'
 			when _campaign_name_ ilike '%Gigabox%' then 'Fiber'
@@ -29,7 +29,7 @@ create or replace function dashboards.utils_campaign_mapping(_campaign_id_ text,
 			when _campaign_name_ ilike '%Verpasse Anrufe%' then 'Abandoned Calls' 
 			when _campaign_name_ ilike '%SITU%' then 'SITU'
 			when _campaign_name_ ilike '%Content Tu_%' then 'Content'
-			when _campaign_name_ ilike '%Sunrise Prepaid%' then 'Sunrise Prepaid'
+			when _campaign_name_ ilike '%Sunrise Prepaid%' then 'Prepaid'
 			when _campaign_name_ ilike '%Pre_%' then 'Prepaid'
 			-- 
 --			when _campaign_name_ ilike '%Campaign1%' then 'Other'

@@ -37,7 +37,7 @@ create table if not exists dashboards.public_reports (
 	name varchar(256), 											-- Report name to be displayed in the frontend
 	description varchar,										-- Report description to be displayed in the frontend
 	ranking int,												-- Rank of the report in the list of available dashboards
-	aggregated boolean default false,
+	aggregated boolean default false,							-- Is the data aggregated or raw data (typically at call,  contact, and/or agent level)
 	roles_allowed int[], 										-- List of role_id allowed to use the report
 	enabled boolean default true,
 	caching int default null,									-- How long (in seconds) should a report be cached
@@ -54,7 +54,8 @@ create table if not exists dashboards.public_reports (
 delete from dashboards.public_reports where 1=1;
 insert into dashboards.public_reports (source_schema, source_table, name, description, ranking, aggregated, roles_allowed, caching) values 
 	( 'dashboards',	'summary_call_statistics',		'[Overview] Call Statistics',						'Overview of calls and call outcome aggregated per day/week/month/... and team/partner/brand/...', 100, true, '{0,1,2,3,4}', 3600 * 6),
-	( 'dashboards',	'summary_agent_statistics',		'[Overview] Agent Statistics',						'Overview of call statistics per agent aggregated per week/month/... and team/partner/brand/...', 101, true, '{0,1,2,3,4}', 3600 * 24),
+	( 'dashboards',	'summary_contact_statistics',	'[Overview] Contact Statistics',					'Overview of contacts per outcomeaggregated per file and team/partner/brand/...', 101, true, '{0,1,2}', 3600 * 6),
+	( 'dashboards',	'summary_agent_statistics',		'[Overview] Agent Statistics',						'Overview of call statistics per agent aggregated per week/month/... and team/partner/brand/...', 102, true, '{0,1,2,3,4}', 3600 * 24),
 	( 'dashboards',	'summary_call_costs',			'[Overview] Call Costs',							'Overview of call types & call costs aggregated per day/week/month/... and team/partner/brand/...', 200, true, '{0,1}', 3600 * 6),
 	( 'dashboards',	'details_call_cost_expensive',	'[Raw Data] Call details (expensive calls *only*)',	'Raw data exports with call type & call cost information for expensive calls', 900, false, '{0,1}', 3600 * 12)
 ;

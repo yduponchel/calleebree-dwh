@@ -22,6 +22,55 @@ select length(campaign_id), count(*) from calls group by 1;
 
 
 -- --------------------------------------------------------------------------------
+-- Migration of Campaigns & Files
+-- --------------------------------------------------------------------------------
+
+select 
+	sponsors.id as sponsor_id,
+	sponsors.name as sponsor_name,
+	brands.id as brand_id,
+	brands.name as brand_name,
+	campaigns.id as campaign_id,
+	campaigns.name as campaign_name,
+	dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) as campaign_alias, 
+	files.id as file_id,
+	files.name as file_name,
+	dashboards.utils_format_date(files.date_inserted) as file_date,
+	count(contacts.id) as file_contacts
+from campaigns as campaigns
+left join brands as brands on brands.id = campaigns.brand_id 
+left join sponsors as sponsors on sponsors.id = campaigns.sponsor_id 
+left join files as files on files.campaign_id = campaigns.id 
+left join contacts as contacts on contacts.file_id = files.id 
+group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10
+;
+
+
+-- --------------------------------------------------------------------------------
+-- Model Consistency Check
+-- --------------------------------------------------------------------------------
+
+select 
+	sponsors_expected.id as sponsor_id_expected,
+	sponsors_expected.name as sponsor_name_expected,
+	sponsors_model.id as sponsor_id_model,
+	sponsors_model.name as sponsor_name_model,
+	brands.id as brand_id,
+	brands.name as brand_name,
+	campaigns.id as campaign_id,
+	campaigns.name as campaign_name
+from campaigns as campaigns
+left join brands as brands on brands.id = campaigns.brand_id 
+left join sponsors as sponsors_expected on sponsors_expected.id = campaigns.sponsor_id 
+left join sponsors as sponsors_model on sponsors_model.id = brands.sponsor_id 
+where 1=0
+	or campaigns.sponsor_id <> brands.sponsor_id 
+	or campaigns.brand_id is null 
+	or campaigns.sponsor_id is null
+;
+
+
+-- --------------------------------------------------------------------------------
 -- Dashboards Reports, Utils, and related
 -- --------------------------------------------------------------------------------
 

@@ -132,6 +132,67 @@ order by 11, 14, 15
 
 
 -- --------------------------------------------------------------------------------
+-- Contact Statistics 
+-- --------------------------------------------------------------------------------
+
+-- select * from dashboards.summary_contact_statistics;
+
+drop view if exists dashboards.summary_contact_statistics;
+create or replace view dashboards.summary_contact_statistics as 
+select 
+	-- --------------------------------------------------------------------------------
+	-- Context
+	contacts.sponsor_id,
+	contacts.brand_id,
+	contacts.partner_id,
+	null::uuid as team_id,
+	null::uuid as user_id,
+	contacts.campaign_id,
+	contacts.file_id,
+	-- --------------------------------------------------------------------------------
+	-- Time windows
+	dashboards.utils_format_year(contacts.date_created) as year,
+	dashboards.utils_format_month(contacts.date_created) as month,
+	dashboards.utils_format_week(contacts.date_created) as week,
+	dashboards.utils_format_date(contacts.date_created) as date,
+	dashboards.utils_format_day_of_week(contacts.date_created) as day_of_week,
+	-- --------------------------------------------------------------------------------
+	-- Hierarchy
+	sponsors.name as sponsor_name,
+	brands.name as brand_name,
+	partners.name as partner_name,
+	null::varchar(128) as team_name,
+	null::varchar(128) as agent_name,
+	dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) as campaign_name,
+	files.name as file_name,
+	-- --------------------------------------------------------------------------------
+	-- Report specific attributes
+	contacts.level_1_code,
+	contacts.level_2_code,
+	contacts.level_3_code,
+	-- --------------------------------------------------------------------------------
+	-- coalesce(contacts.next_contact, contacts.last_contacted, contacts.date_created) as XXX_last_touch
+	-- --------------------------------------------------------------------------------
+	count(distinct contacts.id) as contacts
+-- --------------------------------------------------------------------------------
+from public.contacts as contacts
+left join public.sponsors as sponsors on sponsors.id = contacts.sponsor_id
+left join public.brands as brands on brands.id = contacts.brand_id 
+left join public.partners as partners on partners.id = contacts.partner_id
+--left join public.team as teams on teams.id = contacts.team_id
+left join public.campaigns as campaigns on campaigns.id = contacts.campaign_id
+left join public.files as files on files.id = contacts.file_id
+where 1=1
+	and contacts.sponsor_id = 103
+	and contacts.brand_id in ( 3, 5 ) 
+group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22
+-- having count(*) >= 10
+-- order by 11, 14, 15
+;
+
+
+
+-- --------------------------------------------------------------------------------
 -- Cost Analysis
 -- --------------------------------------------------------------------------------
 
