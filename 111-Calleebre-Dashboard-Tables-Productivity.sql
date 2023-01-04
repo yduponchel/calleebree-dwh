@@ -10,6 +10,13 @@
 -- --------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 
+-- create index on public.calls (sponsor_id);
+-- create index on public.calls (team_id);
+-- create index on public.calls (user_id);
+-- create index on public.calls (contact_id);
+-- create index on public.calls (level_1_code);
+-- create index on public.calls (level_2_code);
+-- create index on public.calls (level_3_code);
 
 
 -- Query Time: 20 seconds
@@ -119,13 +126,22 @@ end;
 $$ language plpgsql;
 
 
+
+
+
+
+
 -- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- 
 -- Productivity & Efficiency | Views
+-- 
+-- --------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 
 -- select * from dashboards.trends_productivity_monthly_partners;
 
-drop view if exists dashboards.trends_productivity_monthly_partners;
+drop view if exists dashboards.trends_productivity_monthly_partners cascade;
 create or replace view dashboards.trends_productivity_monthly_partners as 
 select * from dashboards.trends_productivity(true, true, true, false, false, false, false, 'month'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -133,7 +149,7 @@ select * from dashboards.trends_productivity(true, true, true, false, false, fal
 
 -- select * from dashboards.trends_productivity_monthly_campaigns;
 
-drop view if exists dashboards.trends_productivity_monthly_campaigns;
+drop view if exists dashboards.trends_productivity_monthly_campaigns cascade;
 create or replace view dashboards.trends_productivity_monthly_campaigns as 
 select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'month'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -141,7 +157,7 @@ select * from dashboards.trends_productivity(true, true, false, false, false, tr
 
 -- select * from dashboards.trends_productivity_weekly_partners;
 
-drop view if exists dashboards.trends_productivity_weekly_partners;
+drop view if exists dashboards.trends_productivity_weekly_partners cascade;
 create or replace view dashboards.trends_productivity_weekly_partners as 
 select * from dashboards.trends_productivity(true, true, true, false, false, false, false, 'week'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -149,7 +165,7 @@ select * from dashboards.trends_productivity(true, true, true, false, false, fal
 
 -- select * from dashboards.trends_productivity_weekly_campaigns;
 
-drop view if exists dashboards.trends_productivity_weekly_campaigns;
+drop view if exists dashboards.trends_productivity_weekly_campaigns cascade;
 create or replace view dashboards.trends_productivity_weekly_campaigns as 
 select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'week'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -157,7 +173,7 @@ select * from dashboards.trends_productivity(true, true, false, false, false, tr
 
 -- select * from dashboards.trends_productivity_daily_partners;
 
-drop view if exists dashboards.trends_productivity_daily_partners;
+drop view if exists dashboards.trends_productivity_daily_partners cascade;
 create or replace view dashboards.trends_productivity_daily_partners as 
 select * from dashboards.trends_productivity(true, true, true, false, false, false, false, 'day'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -165,7 +181,7 @@ select * from dashboards.trends_productivity(true, true, true, false, false, fal
 
 -- select * from dashboards.trends_productivity_daily_campaigns;
 
-drop view if exists dashboards.trends_productivity_daily_campaigns;
+drop view if exists dashboards.trends_productivity_daily_campaigns cascade;
 create or replace view dashboards.trends_productivity_daily_campaigns as 
 select * from dashboards.trends_productivity(true, true, false, false, false, true, false, 'day'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 
@@ -173,7 +189,7 @@ select * from dashboards.trends_productivity(true, true, false, false, false, tr
 
 -- select * from dashboards.trends_productivity_daily_teams;
 
--- drop view if exists dashboards.trends_productivity_daily_teams;
+-- drop view if exists dashboards.trends_productivity_daily_teams cascade;
 -- create or replace view dashboards.trends_productivity_daily_teams as 
 -- select * from dashboards.trends_productivity(true, true, true, true, false, true, false, 'day'); -- sponsor, brand, partner, team, agent, campaign, file, interval
 

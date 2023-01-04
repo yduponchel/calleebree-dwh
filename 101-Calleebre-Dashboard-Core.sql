@@ -133,21 +133,35 @@ insert into dashboards.public_widgets (
 		null, null, null, 'Total Duration (minutes)', 0, 'lines', 'duration_minutes', 'sum'
 	),
 	(
-		'14b73fdb-bc85-4757-b940-7a07ed72a9b2', 'dashboards', 'widget_quality_campaigns_monthly', 'Campaign Quality Trend (Engagement Level)', 'Engagement quality in comparison to call volume', 127, '{0,1,2}', true, 3600 * 12,
-		'Campaign Quality (Engagement Level)', 'Engagement quality in comparison to call volume (100 = average; higher is better)',
+		'14b73fdb-bc85-4757-b940-7a07ed72a9b2', 'dashboards', 'widget_quality_campaigns_monthly', 'Campaign Quality Trend (Engagement Level)', 'Engagement quality in comparison to call volume handled', 127, '{0,1,2}', true, 3600 * 12,
+		'Campaign Quality (Engagement Level)', 'Engagement quality in comparison to call volume handled (100 = average; higher is better)',
 		'month', null, null, 'Months', +1,
-		'campaign_name', null, null, 'Call Volume (#)', 0, 'stacked columns', 'calls', 'sum', 
-		'campaign_name', null, null, 'Engagement KPI (100=average)', 0, 'lines', 'quality_engaged', 'average'
+		'campaign_name', null, null, 'Call Volume (# of handled calls)', 0, 'stacked columns', 'total_calls_handled', 'sum', 
+		'campaign_name', null, null, 'Engagement KPI (100=average)', 0, 'lines', 'index_quality_calls_engaged', 'average'
 	),
 	(
-		'ba589261-525d-496a-b183-62dc2cc94c97', 'dashboards', 'widget_quality_campaigns_current', 'Campaign Quality (Engagement Level)', 'Various quality KPIs in comparison to call volume', 200, '{0,1,2,3,4}', true, 3600 * 4,
-		'Campaign Quality (Engagement Level)', 'Call volume with breakdown per call type in comparison to call volume (100 = average; higher is better)',
+		'ba589261-525d-496a-b183-62dc2cc94c97', 'dashboards', 'widget_quality_campaigns_current', 'Campaign Quality (Last 3 weeks)', 'Various quality KPIs', 200, '{0,1,2,3,4}', true, 3600 * 4,
+		'Campaign Quality (Engagement Level)', 'Call volume with breakdown per call type',
 		'campaign_name', null, null, 'Campaigns', 0,
-		'call_type', null, null, 'Call Volume (#)', +1, 'stacked bars', 'calls', 'sum', 
-		null, null, null, 'Engagement KPI (100=average)', 0, 'dots', 'quality_engaged', 'average'
+		'call_type', null, null, 'Call Volume (# of calls)', +1, 'stacked bars', 'calls', 'sum', 
+		null, null, null, null, 0, null, null, null
 	),
 	(
-		'38f63030-4908-4118-9bcf-bd0d6e495a88', 'dashboards', 'trends_productivity_monthly_partners', 'Monthly Productivity | Partners', 'Monthly productivity KPIs per partner', 301, '{0,1,2}', true, 3600 * 12,
+		'6ef5603a-141e-4ade-9226-68445bb68a90', 'dashboards', 'widget_quality_agents_weekly', 'Agent Quality Trend (Engagement Level)', 'Engagement quality in comparison to call volume handled', 128, '{0,1,2,3,4}', true, 3600 * 12,
+		'Agent Quality (Engagement Level)', 'Engagement quality in comparison to call volume handled (100 = average; higher is better)',
+		'week', null, null, 'Weeks', +1,
+		'agent_name', null, null, 'Call Volume (# of handled calls)', 0, 'stacked columns', 'total_calls_handled', 'sum', 
+		'agent_name', null, null, 'Engagement KPI (100=average)', 0, 'lines', 'index_quality_calls_engaged', 'average'
+	),
+	(
+		'ba3718b3-b60d-4b33-b908-a574927eefd6', 'dashboards', 'widget_quality_agents_current', 'Agent Quality (Last 3 weeks)', 'Various quality KPIs', 201, '{0,1,2,3,4}', true, 3600 * 4,
+		'Agent Quality (Engagement Level)', 'Call volume with breakdown per call type',
+		'agent_name', null, null, 'Agents', 0,
+		'call_type', null, null, 'Call Volume (# of calls)', +1, 'stacked bars', 'calls', 'sum', 
+		null, null, null, null, 0, null, null, null
+	),
+	(
+		'38f63030-4908-4118-9bcf-bd0d6e495a88', 'dashboards', 'trends_productivity_monthly_partners', 'Monthly Productivity | Partners', 'Monthly productivity KPIs per partner', 300, '{0,1,2}', true, 3600 * 12,
 		'Monthly Productivity | Partners', 'Monthly productivity per partner',
 		'month', null, null, 'Months', +1,
 		'campaign_name', null, null, 'Productive Hours (#)', +1, 'stacked bars', 'total_productive_hours', 'sum', 

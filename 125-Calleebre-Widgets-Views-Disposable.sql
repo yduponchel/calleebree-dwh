@@ -67,7 +67,10 @@ order by 9, sum(calls.cost) desc
 -- Campaign Quality | Monthly
 -- --------------------------------------------------------------------------------
 
+-- select * from dashboards.widget_quality_campaigns_monthly;
+
 drop view if exists dashboards.widget_quality_campaigns_monthly cascade;
+/*
 create or replace view dashboards.widget_quality_campaigns_monthly as 
 select 
 	-- --------------------------------------------------------------------------------
@@ -109,7 +112,7 @@ where 1=1
 	and campaign_name is not null
 order by c.month, c.calls desc
 ;
-
+*/
 
 
 -- --------------------------------------------------------------------------------
@@ -117,6 +120,7 @@ order by c.month, c.calls desc
 -- --------------------------------------------------------------------------------
 
 drop view if exists dashboards.widget_quality_campaigns_current cascade;
+/*
 create or replace view dashboards.widget_quality_campaigns_current as 
 with call_types (call_type) as (values (0), (1), (2), (3)) 
 select 
@@ -167,6 +171,6 @@ where 1=1
 	and campaign_name is not null
 order by c.calls desc
 ;
-
+*/
 
 

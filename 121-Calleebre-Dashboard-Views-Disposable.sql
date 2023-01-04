@@ -167,12 +167,27 @@ select
 	files.name as file_name,
 	-- --------------------------------------------------------------------------------
 	-- Report specific attributes
-	contacts.level_1_code,
-	contacts.level_2_code,
-	contacts.level_3_code,
+	case 
+		when contacts.level_1_code is not null then contacts.level_1_code
+		when calls.level_1_code = 'callback' then 'open'
+		when calls.level_1_code is not null then calls.level_1_code
+		when calls.id is null or contacts.last_contacted is null or rejections = 0 then 'new'
+		else 'UNEXPECTED' end as reason_1,
+	case 
+		when contacts.level_1_code is not null then contacts.level_2_code
+		when calls.level_1_code is not null then calls.level_2_code
+		when calls.id is null and contacts.last_contacted is null and rejections = 0 then '-'
+		else 'UNEXPECTED: ' || (case when calls.id is null then 'calls.id = null' else 'calls.id <> null' end) || ' | ' || (case when contacts.last_contacted is null then 'last_contacted = null' else 'last_contacted = ...' end) || ' | rejections=' || coalesce(rejections, -1)
+			end as reason_2,
+	case 
+		when contacts.level_1_code is not null then contacts.level_3_code
+		when calls.level_1_code is not null then calls.level_3_code
+		when (calls.id is null or contacts.last_contacted is null) and (calls.id is not null or contacts.last_contacted is not null) then contacts.level_2_code
+		else null end as reason_3,
 	-- --------------------------------------------------------------------------------
 	-- coalesce(contacts.next_contact, contacts.last_contacted, contacts.date_created) as XXX_last_touch
 	-- --------------------------------------------------------------------------------
+	count(distinct calls.id),
 	count(distinct contacts.id) as contacts
 -- --------------------------------------------------------------------------------
 from public.contacts as contacts
@@ -182,13 +197,16 @@ left join public.partners as partners on partners.id = contacts.partner_id
 --left join public.team as teams on teams.id = contacts.team_id
 left join public.campaigns as campaigns on campaigns.id = contacts.campaign_id
 left join public.files as files on files.id = contacts.file_id
+left join public.calls as calls on calls.contact_id = contacts.id and calls.date >= contacts.last_contacted - interval '120 minute' and calls.date <= contacts.last_contacted + interval '1 minute'
 where 1=1
 	and contacts.sponsor_id = 103
 	and contacts.brand_id in ( 3, 5 ) 
 group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22
--- having count(*) >= 10
--- order by 11, 14, 15
 ;
+
+
+-- select level_1_code,level_2_code,level_3_code,count(*) from contacts group by 1,2,3 order by 4 desc;
+-- select level_1_code,level_2_code,level_3_code,count(*) from calls group by 1,2,3 order by 4 desc;
 
 
 
