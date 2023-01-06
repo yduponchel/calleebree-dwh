@@ -21,50 +21,13 @@ select length(id), count(*) from campaigns group by 1;
 select length(campaign_id), count(*) from calls group by 1;
 
 
--- --------------------------------------------------------------------------------
--- Migration of Campaigns & Files
--- --------------------------------------------------------------------------------
-insert into dashboards.migration_files_mapping (sponsor_new, campaign_alt, file_id, file_id_new, file_name, legacy_flag, comments) values 
 
--- Campaign Migration
-select 
-	sponsors.id as sponsor_id,
-	coalesce(mappings.sponsor_new || ' | ' || sponsors.name, sponsors.name) as sponsor_alias,
-	sponsors.name as sponsor_name,
-	brands.id as brand_id,
-	coalesce(mappings.sponsor_new ||  ' | ' || brands.name, brands.name) as brand_alias,
-	brands.name as brand_name,
-	campaigns.id as campaign_id,
-	dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) as campaign_alias, 
-	campaigns.name as campaign_name,
-	dashboards.utils_format_month(files.date_inserted) as file_month,
-	dashboards.utils_format_date(files.date_inserted) as file_date,
-	coalesce(mappings.file_id_new, files.id) as file_id_new,
-	files.id as file_id,
-	coalesce(mappings.file_name, files.name) as file_alias,
-	files.name as file_name,
-	mappings.comments as comments,
-	case when mappings.file_id is null then 0 else 1 end as mapped_flag,
-	case when count(distinct contacts.id) = 0 then 1 else 0 end as empty_flag,
---	rank() over (partition by brands.id, dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) order by files.date_inserted desc) as rank_in_campaign,
---	rank() over (partition by brands.id, dashboards.utils_campaign_mapping(campaigns.id, campaigns.name), dashboards.utils_format_month(files.date_inserted) order by files.date_inserted desc) as rank_in_campaign_month,
-	count(distinct contacts.id) as file_contacts,
---	count(distinct recycled.id) as file_contacts_recycled,
-	count(distinct calls.id) as file_calls
-from campaigns as campaigns
-left join brands as brands on brands.id = campaigns.brand_id 
-left join sponsors as sponsors on sponsors.id = campaigns.sponsor_id 
-left join files as files on files.campaign_id = campaigns.id 
-left join dashboards.migration_files_mapping as mappings on mappings.file_id = files.id
-left join contacts as contacts on contacts.file_id = files.id 
-left join calls as calls on calls.contact_id = contacts.id 
--- left join contacts as recycled on (recycled.phone = contacts.phone /*or recycled.email = contacts.email*/) and recycled.date_created < contacts.date_created 
-group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17
-;
+
 
 -- --------------------------------------------------------------------------------
-
 -- Recycling Ratio
+-- --------------------------------------------------------------------------------
+
 -- TOO SLOW | NOT RETURNING
 select 
 	sponsors.id as sponsor_id,
@@ -93,10 +56,19 @@ group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 -- Model Consistency Check
 -- --------------------------------------------------------------------------------
 
--- create index on public.calls (file_id);
 -- create index on public.contacts (phone);
 -- create index on public.contacts (email);
 -- create index on public.contacts (date_created);
+
+-- create index on public.calls (sponsor_id);
+-- create index on public.calls (file_id);
+-- create index on public.calls (team_id);
+-- create index on public.calls (user_id);
+-- create index on public.calls (contact_id);
+-- create index on public.calls (level_1_code);
+-- create index on public.calls (level_2_code);
+-- create index on public.calls (level_3_code);
+
 
 -- --------------------------------------------------------------------------------
 
