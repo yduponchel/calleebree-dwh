@@ -1,59 +1,5 @@
 -- --------------------------------------------------------------------------------
--- --------------------------------------------------------------------------------
--- Regression Testing & Sanity Checks
--- --------------------------------------------------------------------------------
--- --------------------------------------------------------------------------------
-
--- List all tables & views
--- $ grep "create.*view" *sql | sed -e "s/:.* dashboards./[VIEW]:\t\t/" | sed -e "s/ .*//";grep "create.*table" *sql | sed -e "s/:.* dashboards./[TABLE]:\t\t/" | sed -e "s/ .*//"
-
-select * from dashboards.utils_check_model_consistency;
-
-select * from dashboards.utils_check_dashboards_missing;
-
-select * from dashboards.utils_check_dashboards_consistency;
-
--- --------------------------------------------------------------------------------
-
--- TODO: add a view that checks all public table to check the consistency of the various '_id' columns...
-select length(id), count(*) from partners group by 1;
-select length(id), count(*) from campaigns group by 1;
-select length(campaign_id), count(*) from calls group by 1;
-
-
-
-
-
--- --------------------------------------------------------------------------------
--- Recycling Ratio
--- --------------------------------------------------------------------------------
-
--- TOO SLOW | NOT RETURNING
-select 
-	sponsors.id as sponsor_id,
-	sponsors.name as sponsor_name,
-	brands.id as brand_id,
-	brands.name as brand_name,
-	campaigns.id as campaign_id,
-	dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) as campaign_alias, 
-	campaigns.name as campaign_name,
-	dashboards.utils_format_month(files.date_inserted) as file_month,
-	dashboards.utils_format_date(files.date_inserted) as file_date,
-	files.id as file_id,
-	files.name as file_name,
-	count(distinct contacts.id) as file_contacts,
-	count(distinct recycled.id) as file_contacts_recycled
-from campaigns as campaigns
-left join brands as brands on brands.id = campaigns.brand_id 
-left join sponsors as sponsors on sponsors.id = campaigns.sponsor_id 
-left join files as files on files.campaign_id = campaigns.id 
-left join contacts as contacts on contacts.file_id = files.id 
-left join contacts as recycled on (recycled.phone = contacts.phone /*or recycled.email = contacts.email*/) and recycled.date_created < contacts.date_created 
-group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
-;
-
--- --------------------------------------------------------------------------------
--- Model Consistency Check
+-- Performance Tuning
 -- --------------------------------------------------------------------------------
 
 -- create index on public.contacts (phone);
@@ -70,6 +16,52 @@ group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 -- create index on public.calls (level_3_code);
 
 
+
+-- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- 
+-- Consistency & Sanity Checks
+-- 
+-- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+
+
+
+-- --------------------------------------------------------------------------------
+-- Dashboards
+-- --------------------------------------------------------------------------------
+
+
+
+-- List all tables & views
+-- $ grep "create.*view" *sql | sed -e "s/:.* dashboards./[VIEW]:\t\t/" | sed -e "s/ .*//";grep "create.*table" *sql | sed -e "s/:.* dashboards./[TABLE]:\t\t/" | sed -e "s/ .*//"
+
+-- Type consistency checks within core tables => what a mess!!!
+select * from dashboards.utils_check_model_consistency;
+
+-- Missing tables or columns => ok (2023-01-08)
+select * from dashboards.utils_check_dashboards_missing;
+
+-- Type consistency checks within dashboard tables & views => mess apparently due to mess in core tables
+select * from dashboards.utils_check_dashboards_consistency;
+
+
+
+-- --------------------------------------------------------------------------------
+-- Core Model
+-- --------------------------------------------------------------------------------
+
+
+
+-- consistency of data within "partners" => 29 ok | 4 NOK
+select length(id), count(*) from partners group by 1;
+
+-- consistency of data within "campaigns" => ok
+select length(id), count(*) from campaigns group by 1;
+
+-- consistency of data within "calls" => ok
+select length(campaign_id), count(*) from calls group by 1;
+
 -- --------------------------------------------------------------------------------
 
 -- IDs not set in Calls
@@ -82,6 +74,18 @@ select
 	sum(case when team_id is null then 1 else 0 end) as null_teams,
 	sum(case when user_id is null then 1 else 0 end) as null_users
 from calls;
+
+-- --------------------------------------------------------------------------------
+
+-- Non-E164 phone numbers
+select 
+	sum(case when dialed_number not like '+%' and dialed_number not like '00%' then 1 else 0 end) as format_e164,
+	sum(case when dialed_number like '+%' then 1 else 0 end) as format_plus,
+	sum(case when dialed_number like '00%' then 1 else 0 end) as format_00
+from calls
+where 1=1
+	and sponsor_id = 103
+;
 
 -- --------------------------------------------------------------------------------
 
@@ -105,40 +109,84 @@ where 1=0
 	or campaigns.sponsor_id is null
 ;
 
-
 -- --------------------------------------------------------------------------------
 
-select * 
+-- Inconsistencies between "contacts" and "calls" tables
+select 
+--	sum(case when calls.id is null and contacts.last_contacted is null then 1 else 0 end) as no_last_call, 
+	sum(case when calls.id is not null and contacts.last_contacted is not null then 1 else 0 end) as matching_last_call, 
+	sum(case when calls.id is not null and contacts.last_contacted is null then 1 else 0 end) as missing_last_contacted_date, 
+	sum(case when calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call
+--	sum(case when contacts.call_id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_call_id,
+--	sum(case when contacts.call_id is not null and calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call
 from contacts 
 left join calls on calls.contact_id = contacts.id 
-where calls.id is not null and contacts.last_contacted is null
 ;
+
+-- Contacts with calls missing a "last_contacted" date
+select *  from contacts  left join calls on calls.contact_id = contacts.id  where calls.id is not null and contacts.last_contacted is null;
+
+-- Contacts with a "last_contacted" date set but no associated call found
+select * from contacts left join calls on calls.contact_id = contacts.id where calls.id is null and contacts.last_contacted is not null;
+
+-- Contacts with no "dialed_number" (typically also invalid in "contacts.phone")
+select count(*) from calls left join contacts on contacts.id = calls.contact_id where dialed_number = '' and contact_id is not null and contacts.phone is not null and contacts.phone = '';
+select count(*) from calls where dialed_number = '';
 
 -- --------------------------------------------------------------------------------
 
-select * 
-from contacts 
-left join calls on calls.contact_id = contacts.id 
-where calls.id is null and contacts.last_contacted is not null 
+-- Inconsistencies and brands and sponsor of teams compared to those of their partner
+-- Fundamentally, if "partners" has a "brand_id" field, than it cannot be shared!!! While some partners may be duplicated, each brand manager shall be able to set his own partners/sites...
+select 
+	partners.id as partner_id,
+	partners.name as partner_name,
+	teams.id as team_id,
+	teams.name as team_name,
+	partners.sponsor_id as partner_sponsor_id,
+	sponsors_team.id as team_sponsor_id,
+	sponsors_partner.name as partner_sponsor_name,
+	sponsors_team.name as team_sponsor_name,
+	partners.brand_id as partner_brand_id,
+	brands_team.id as team_brand_id,
+	brands_partner.name as partner_brand_name,
+	brands_team.name as team_brand_name,
+	partners.sponsor_id = sponsors_team.id as sponsor_check,
+	partners.brand_id = brands_team.id as brand_check
+from partners as partners
+left join team as teams on teams.partner_id = partners.id
+left join sponsors as sponsors_team on sponsors_team.id = teams.sponsor_id
+left join sponsors as sponsors_partner on sponsors_partner.id = partners.sponsor_id
+left join brands as brands_team on brands_team.id = teams.brand_id
+left join brands as brands_partner on brands_partner.id = partners.brand_id
+where 1=1
+	and (1=0
+		or partners.sponsor_id <> sponsors_team.id 
+		or teams.id is null
+		or partners.brand_id <> brands_team.id 
+		)
 ;
 
 
 
+
+
+
 -- --------------------------------------------------------------------------------
--- Dashboards Reports, Utils, and related
+-- --------------------------------------------------------------------------------
+-- 
+-- Dashboards Reports, Widgets, and related
+-- 
+-- --------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 
 select * from information_schema.tables where table_schema = 'dashboards' order by table_name;
 select * from information_schema.columns where table_schema = 'dashboards' order by table_name, column_name ; -- and table_name = 'table_name';
 select routine_schema, routine_name, data_type, routine_type, routine_definition from information_schema.routines where routine_schema = 'dashboards' order by routine_name;
 
-
 -- --------------------------------------------------------------------------------
 
 select * from dashboards.public_dashboards;
 select * from dashboards.public_widgets;
-
--- TODO FIXME: check that table/views listed actually do exist!!!
 
 -- --------------------------------------------------------------------------------
 
@@ -170,42 +218,41 @@ select * from dashboards.trends_productivity_daily_teams;
 
 -- --------------------------------------------------------------------------------
 
+-- Query time: 30 seconds
 select * from dashboards.trends_reachability;
 
 
--- --------------------------------------------------------------------------------
 
-select count(*) as count, min(month) as month_min, max(month) as month_max from dashboards.trends_monthly_quality_campaigns;
--- 
-call dashboards.trends_monthly_quality_campaigns_refresh();
--- 
-call dashboards.trends_monthly_quality_campaigns_kpi_global_refresh(null);
-call dashboards.trends_monthly_quality_campaigns_kpi_sponsors_refresh(null);
-call dashboards.trends_monthly_quality_campaigns_kpi_brands_refresh(null);
-call dashboards.trends_monthly_quality_campaigns_kpi_campaigns_refresh(null);
---call dashboards.trends_monthly_quality_campaigns_kpi_files_refresh(null);
--- 
-select count(*) as count, min(month) as month_min, max(month) as month_max from dashboards.trends_monthly_quality_campaigns;
-select * from dashboards.trends_monthly_quality_campaigns where sponsor_id is null;
-select * from dashboards.trends_monthly_quality_campaigns where sponsor_id is not null and brand_id is null;
-select * from dashboards.trends_monthly_quality_campaigns where brand_id is not null and campaign_name is null;
-select * from dashboards.trends_monthly_quality_campaigns where campaign_name is not null and file_id is null order by month desc, calls desc;
+
+
+
 
 -- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- 
+-- Core model
+-- 
+-- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
 
-select count(*) as count, min(week) as week_min, max(week) as week_max from dashboards.trends_weekly_quality_agents;
--- 
-call dashboards.trends_weekly_quality_agents_refresh();
--- 
-call dashboards.trends_weekly_quality_agents_kpi_global_refresh(null);
-call dashboards.trends_weekly_quality_agents_kpi_sponsors_refresh(null);
-call dashboards.trends_weekly_quality_agents_kpi_brands_refresh(null);
--- 
-select count(*) as count, min(week) as week_min, max(week) as week_max from dashboards.trends_weekly_quality_agents;
-select * from dashboards.trends_weekly_quality_agents where sponsor_id is null;
-select * from dashboards.trends_weekly_quality_agents where sponsor_id is not null and brand_id is null;
-select * from dashboards.trends_weekly_quality_agents where brand_id is not null and campaign_name is null;
 
+-- Campaigns found in the "calls" table
+select sponsors.name, count(distinct calls.campaign_id) as campaigns_with_calls, count(*) as calls from calls left join sponsors on sponsors.id = calls.sponsor_id group by 1;
+
+select * from public.calls limit 1000;
+select * from public.contacts limit 1000;
+
+
+
+
+
+
+-- --------------------------------------------------------------------------------
+-- --------------------------------------------------------------------------------
+-- 
+-- Utilities and helper functions | Regression testing
+-- 
+-- --------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 
 select dashboards.utils_duration_minutes(0 = 0);
@@ -283,23 +330,93 @@ select * from dashboards.utils_logs order by date_native desc limit 5;
 
 
 
+
+
+
+
+
+
+
 -- --------------------------------------------------------------------------------
--- Core model
+-- --------------------------------------------------------------------------------
+-- 
+-- Miscellaneous
+-- 
+-- --------------------------------------------------------------------------------
 -- --------------------------------------------------------------------------------
 
+
+
+-- --------------------------------------------------------------------------------
+-- Calling statistics
+-- --------------------------------------------------------------------------------
+
+-- Attempts distribution
+with dialed_numbers as (
+	select dialed_number, count(*) as attempts 
+	from calls 
+	left join campaigns on campaigns.id = calls.campaign_id 
+--	where calls.sponsor_id = 103 and dialed_number <> '' 
+	where calls.sponsor_id = 103 and dialed_number <> '' and dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) <> '!!! TEST'
+	group by 1 
+	having count(*) > 3
+	)
 select 
-	sum(case when sponsor_id is null then 1 else 0 end) as missing_sponsor,
-	sum(case when brand_id is null then 1 else 0 end) as missing_brand,
-	sum(case when partner_id is null then 1 else 0 end) as missing_partner,
-	sum(case when team_id is null then 1 else 0 end) as missing_team,
-	sum(case when user_id is null then 1 else 0 end) as missing_user,
-	sum(case when campaign_id is null then 1 else 0 end) as missing_campaign,
-	sum(case when file_id is null then 1 else 0 end) as missing_file
-from calls as calls
+	attempts,
+	count(dialed_number) as contacts
+from dialed_numbers
+group by 1
+order by 1 desc
 ;
 
-select sponsors.name, count(distinct calls.campaign_id) from calls left join sponsors on sponsors.id = calls.sponsor_id group by 1;
+-- --------------------------------------------------------------------------------
 
-select * from public.calls limit 1000;
+-- Numbers called too frequently
+select 
+	dialed_number,
+	count(calls.id) as calls,
+	count(distinct contact_id) as contacts,
+	count(distinct file_id) as files,
+	count(distinct campaign_id) as campaigns,
+	count(distinct brand_id) as brands
+from calls 
+--left join campaigns on campaigns.id = calls.campaign_id
+where 1=1
+	and sponsor_id = 103
+	and dialed_number <> '' 
+--	and dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) <> '!!! TEST'
+group by dialed_number 
+having count(*) > 5
+order by 2 desc, 3 desc, 4 desc
+;
 
+
+
+-- --------------------------------------------------------------------------------
+-- Recycling Ratio
+-- --------------------------------------------------------------------------------
+
+-- TOO SLOW | NOT RETURNING
+select 
+	sponsors.id as sponsor_id,
+	sponsors.name as sponsor_name,
+	brands.id as brand_id,
+	brands.name as brand_name,
+	campaigns.id as campaign_id,
+	dashboards.utils_campaign_mapping(campaigns.id, campaigns.name) as campaign_alias, 
+	campaigns.name as campaign_name,
+	dashboards.utils_format_month(files.date_inserted) as file_month,
+	dashboards.utils_format_date(files.date_inserted) as file_date,
+	files.id as file_id,
+	files.name as file_name,
+	count(distinct contacts.id) as file_contacts,
+	count(distinct recycled.id) as file_contacts_recycled
+from campaigns as campaigns
+left join brands as brands on brands.id = campaigns.brand_id 
+left join sponsors as sponsors on sponsors.id = campaigns.sponsor_id 
+left join files as files on files.campaign_id = campaigns.id 
+left join contacts as contacts on contacts.file_id = files.id 
+left join contacts as recycled on (recycled.phone = contacts.phone /*or recycled.email = contacts.email*/) and recycled.date_created < contacts.date_created 
+group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
+;
 
