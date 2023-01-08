@@ -7,11 +7,11 @@
 -- List all tables & views
 -- $ grep "create.*view" *sql | sed -e "s/:.* dashboards./[VIEW]:\t\t/" | sed -e "s/ .*//";grep "create.*table" *sql | sed -e "s/:.* dashboards./[TABLE]:\t\t/" | sed -e "s/ .*//"
 
-select * from dashboards.utils_check_model_inconsistent;
+select * from dashboards.utils_check_model_consistency;
 
 select * from dashboards.utils_check_dashboards_missing;
 
-select * from dashboards.utils_check_dashboards_inconsistent;
+select * from dashboards.utils_check_dashboards_consistency;
 
 -- --------------------------------------------------------------------------------
 
@@ -72,6 +72,7 @@ group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11
 
 -- --------------------------------------------------------------------------------
 
+-- IDs not set in Calls
 select 
 	sum(case when sponsor_id is null then 1 else 0 end) as null_sponsors,
 	sum(case when brand_id is null then 1 else 0 end) as null_brands,
@@ -84,6 +85,7 @@ from calls;
 
 -- --------------------------------------------------------------------------------
 
+-- Illegal Campaign IDs
 select 
 	sponsors_expected.id as sponsor_id_expected,
 	sponsors_expected.name as sponsor_name_expected,

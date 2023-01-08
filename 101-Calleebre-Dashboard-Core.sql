@@ -226,21 +226,25 @@ insert into dashboards.public_widgets (
 -- Consistency Checks
 -- --------------------------------------------------------------------------------
 
-drop table if exists dashboards.reports_skeleton;
+drop table if exists dashboards.reports_skeleton cascade;
 create table if not exists dashboards.reports_skeleton (
 	-- --------------------------------------------------------------------------------
 	id uuid default gen_random_uuid () primary key,
 	-- 
-	column_name varchar(256),
-	udt_name varchar(256),
+	column_name varchar(256) not null,
+	udt_name varchar(256) not null,
 	type_length int,
-	ordinal_position int,
+	ordinal_position int, -- null <==> optional type
 	-- --------------------------------------------------------------------------------
 	-- Constraints
 	unique (column_name)
 );
 
+
+
 -- --------------------------------------------------------------------------------
+
+-- select * from dashboards.reports_skeleton;
 
 delete from dashboards.reports_skeleton where 1=1;
 insert into dashboards.reports_skeleton (column_name, udt_name, type_length, ordinal_position) values 
@@ -267,18 +271,30 @@ insert into dashboards.reports_skeleton (column_name, udt_name, type_length, ord
 	( 'team_name', 'varchar', 128, 16 ),
 	( 'agent_name', 'varchar', 128, 17 ),
 	( 'campaign_name', 'varchar', 256, 18 ),
-	( 'file_name', 'varchar', 256, 19 )
+	( 'file_name', 'varchar', 256, 19 ),
+	-- Other possible types (optional)
+	( 'offer_id', 'int4', 32, null ),
+	( 'call_id', 'varchar', 36, null ),
+	( 'contact_id', 'varchar', 36, null ),
+	( 'phone_number_id', 'uuid', null, null ),
+	( 'hangup_reason_id', 'uuid', null, null ),
+	( 'account_id', 'uuid', null, null ),
+	( 'currency_id', 'varchar', 36, null ),
+	( 'language_id', 'varchar', 36, null )
 ;
 
--- select * from dashboards.reports_skeleton;
+
 
 -- --------------------------------------------------------------------------------
--- Model inconsistencies
+-- Model (in)consistencies
 -- --------------------------------------------------------------------------------
 
-drop view if exists dashboards.utils_check_model_inconsistent;
-create or replace view dashboards.utils_check_model_inconsistent as 
+-- select * from dashboards.utils_check_model_consistency;
+
+drop view if exists dashboards.utils_check_model_consistency;
+create or replace view dashboards.utils_check_model_consistency as 
 select 
+	case when skelton.udt_name is null then null when skelton.udt_name <> info_columns.udt_name or skelton.type_length <> coalesce(info_columns.character_maximum_length, info_columns.numeric_precision) then 'INVALID TYPE' else '-' end as type_check,
 	-- Context
 	info_tables.table_type,
 	info_tables.table_schema,
@@ -290,19 +306,20 @@ select
 	info_columns.ordinal_position
 from information_schema.tables as info_tables
 left join information_schema.columns as info_columns on info_tables.table_schema = info_columns.table_schema and info_columns.table_name = info_tables.table_name 
+left join dashboards.reports_skeleton skelton on skelton.column_name = info_columns.column_name
 where 1=1
 	and info_tables.table_schema = 'public'
 	and info_columns.column_name like '%_id'
 order by info_columns.column_name, info_tables.table_name
 ;
 
--- select * from dashboards.utils_check_model_inconsistent;
-
 
 
 -- --------------------------------------------------------------------------------
 -- Missing tables
 -- --------------------------------------------------------------------------------
+
+-- select * from dashboards.utils_check_dashboards_missing;
 
 drop view if exists dashboards.utils_check_dashboards_missing;
 create or replace view dashboards.utils_check_dashboards_missing as 
@@ -321,14 +338,15 @@ from checks as checks
 left join information_schema.tables as info_tables on checks.source_schema = info_tables.table_schema and checks.source_table = info_tables.table_name 
 full join dashboards.reports_skeleton as skeleton on 1=1 
 left join information_schema.columns as info_columns on info_tables.table_name = info_columns.table_name and info_columns.column_name = skeleton.column_name
-where 1=0 
-	or info_tables.table_name is null	
-	or info_columns.column_name is null
+where 1=1
+	and skeleton.ordinal_position is not null
+	and (1=0
+		or info_tables.table_name is null	
+		or info_columns.column_name is null
+		)
 group by 1, 2, 3, 4
 order by 1, 2, 4
 ;
-
--- select * from dashboards.utils_check_dashboards_missing;
 
 
 
@@ -336,8 +354,10 @@ order by 1, 2, 4
 -- Inconsistent tables
 -- --------------------------------------------------------------------------------
 
-drop view if exists dashboards.utils_check_dashboards_inconsistent;
-create or replace view dashboards.utils_check_dashboards_inconsistent as 
+-- select * from dashboards.utils_check_dashboards_consistency;
+
+drop view if exists dashboards.utils_check_dashboards_consistency;
+create or replace view dashboards.utils_check_dashboards_consistency as 
 with checks as (
 	select 'reports', reports.source_schema, reports.source_table from dashboards.public_reports as reports
 	union
@@ -369,6 +389,7 @@ full join dashboards.reports_skeleton as skeleton on 1=1
 left join information_schema.columns as info_columns on info_tables.table_schema = info_columns.table_schema and info_columns.table_name = info_tables.table_name and info_columns.column_name = skeleton.column_name
 where 1=1
 	and info_tables.table_schema = 'dashboards'
+	and skeleton.ordinal_position is not null
 	and ( 0=1
 			or info_columns.column_name is null
 			or not (coalesce(info_columns.udt_name = skeleton.udt_name, false) or (skeleton.udt_name = 'bpchar' and info_columns.udt_name = 'varchar'))
@@ -378,6 +399,5 @@ where 1=1
 order by info_tables.table_name, skeleton.ordinal_position
 ;
 
--- select * from dashboards.utils_check_dashboards_inconsistent;
 
 

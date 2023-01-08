@@ -1,14 +1,17 @@
 
 
+select * from hangup_reasons_setup;
+
+
 -- --------------------------------------------------------------------------------
+-- 
 -- Agents buring leads
 --
+-- --------------------------------------------------------------------------------
 -- -- Agents with medium to low conversion rate on argumented contacts
 -- -- Agents with proportionaly high rate of short call or simply argumented calls (excluding failed calls) vs. long calls
 -- -- Campaigns with low lead volume and high quality leads
-
- 
-
+-- --------------------------------------------------------------------------------
 
 with campaign_quality as (select * from dashboards.quality_campaigns)
 select 
