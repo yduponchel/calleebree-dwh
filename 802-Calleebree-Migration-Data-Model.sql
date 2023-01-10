@@ -8,10 +8,69 @@
 
 
 -- --------------------------------------------------------------------------------
--- Migration of Campaigns & Files | Clean Export
+-- Migration of Campaigns & Files | Clean Export 
 -- --------------------------------------------------------------------------------
 
 -- DataModel Migration Export
+select 
+	-- 1, 2, 3, 4
+	case when mappings.sponsor_new is null then sponsors.id else null end as sponsor_id_new,
+	sponsors.id as sponsor_id_old,
+	case 
+		when mappings.sponsor_new is not null then sponsors.name  || ' | ' || mappings.sponsor_new
+		else sponsors.name end as sponsor_name_new,
+	sponsors.name as sponsor_name_old,
+	-- 5, 6, 7, 8
+	case when mappings.sponsor_new is null then brands.id else null end as brand_id_new,
+	brands.id as brand_id_old,
+	case 
+		when mappings.sponsor_new is not null then brands.name  || ' | ' || mappings.sponsor_new
+		else brands.name end as brand_name_new,
+	brands.name as brand_name_old,
+	-- 9, 10, 11, 12
+	case when not mappings.legacy_flag then null else campaigns.id end as campaign_id_new,
+	campaigns.id as campaign_id_old,
+	coalesce(mappings.campaign_alt, dashboards.utils_campaign_mapping(campaigns.id, campaigns.name)) as campaign_name_new,
+	campaigns.name as campaign_name_old,
+	-- 13, 14, 15, 16
+	coalesce(mappings.file_id_new, files.id) as file_id_new,
+	files.id as file_id_old,
+	case 
+		when mappings.file_name is not null then mappings.file_name
+		else files.name end as file_name_new,
+	files.name as file_name_old,
+	-- 17, 18, 19, 20, 21
+	dashboards.utils_format_month(files.date_inserted) as file_month,
+	dashboards.utils_format_date(files.date_inserted) as file_date,
+	case 
+		when mappings.legacy_flag then 'Legacy'
+		when mappings.file_id is null then 'Not Mapped' 
+		else 'Mapped' end as flag_mapped,
+	count(distinct contacts.id) as file_contacts,
+	count(distinct calls.id) as file_calls
+	-- 
+from campaigns as campaigns
+left join brands as brands on brands.id = campaigns.brand_id 
+left join sponsors as sponsors on sponsors.id = campaigns.sponsor_id 
+left join files as files on files.campaign_id = campaigns.id 
+left join dashboards.migration_files_mapping as mappings on mappings.file_id = files.id 
+left join contacts as contacts on contacts.file_id = files.id 
+left join calls as calls on calls.contact_id = contacts.id 
+where 1=1
+	and mappings.version like '% v3 %'
+	and campaigns.sponsor_id = 103
+group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19
+having count(distinct contacts.id) > 0
+order by 3, 7, 11, 15, 18 desc
+;
+
+
+
+-- --------------------------------------------------------------------------------
+-- Migration of Campaigns & Files | Extended Export 
+-- --------------------------------------------------------------------------------
+
+-- DataModel Analysis & Migration
 select 
 	-- 1, 2, 3, 4
 	case when mappings.sponsor_new is null then sponsors.id else null end as sponsor_id_new,
@@ -82,6 +141,27 @@ order by 3, 7, 10, 15, 18, 19 desc, 20 desc
 
 
 -- --------------------------------------------------------------------------------
+-- Migration of Offers (Products) | Clean Export
+-- --------------------------------------------------------------------------------
+
+-- Products & Offers
+select 
+	offers.id, offers.date_inserted,
+	offers.name, offers.language_id, offers.price, offers.currency_id, offers.comission, offers.sponsor_id, sponsors.name as sponsor_name, offers.brand_id, brands.name as brand_name, offers.active, offers.deleted, 
+	offers.description, offers.conditions, offers.descriptions, offers.conds,
+	case when offers.language_id = 'en' then 1 else 0 end as language_en,
+	offers_en.id as id_new
+from offers 
+left join offers as offers_en on offers_en.name = offers.name and offers_en.language_id = 'de'
+left join brands on brands.id = offers.brand_id 
+left join sponsors on sponsors.id = offers.sponsor_id 
+where 1=1
+order by offers.sponsor_id, offers.brand_id, offers.active, offers.deleted, offers.name, case offers.language_id when 'de' then 0 when 'fr' then 1 when 'en' then 2 when 'it' then 3 else 9 end, offers.price, offers.date_inserted
+;
+
+
+
+-- --------------------------------------------------------------------------------
 -- Migration of Campaigns & Files | Data Check
 -- --------------------------------------------------------------------------------
 
@@ -131,6 +211,8 @@ where 1=1
 group by 1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21, 22, 23, 24
 ;
 
+
+
 -- --------------------------------------------------------------------------------
 -- Migration of Campaigns & Files | Consistency Check between Versions
 -- --------------------------------------------------------------------------------
@@ -155,6 +237,7 @@ where 1=1
 ;
 
 
+
 -- --------------------------------------------------------------------------------
 -- Campaign Mapping
 -- --------------------------------------------------------------------------------
@@ -177,7 +260,8 @@ create or replace function dashboards.utils_campaign_mapping(_campaign_id_ text,
 			when _campaign_name_ ilike '%Chat%' then 'Chat'
 			when _campaign_name_ ilike '%Aband%' then 'Abandoned Baskets'
 			when _campaign_name_ ilike '%Basket%' then 'Abandoned Baskets'
-			when _campaign_name_ ilike '%Black Friday Missed inbound%' then 'Abandoned Calls (Black Friday)' 
+			when _campaign_name_ ilike '%Black Friday Missed inbound%' then 'Abandoned Calls' 
+--			when _campaign_name_ ilike '%Black Friday Missed inbound%' then 'Abandoned Calls (Black Friday)' 
 			when _campaign_name_ ilike '%Verpasse Anrufe%' then 'Abandoned Calls' 
 			when _campaign_name_ ilike '%SITU%' then 'SITU'
 			when _campaign_name_ ilike '%Sunrise Prepaid%' then 'Up-Sell Mobile (Prepaid Sunrise)'
@@ -1120,11 +1204,11 @@ insert into dashboards.migration_files_mapping (sponsor_new, campaign_alt, file_
 ( null, null, '08b21c9c-c86a-4ad4-97e3-6a2f6c41f9cd', '08b21c9c-c86a-4ad4-97e3-6a2f6c41f9cd', 'Salt Abandoned Calls - 2022-09 (September)', false, null, '2023-01-06 v3 Malin+Yann' ),
 ( null, null, '3bbb19f9-6462-4797-88cf-363bc31fda70', '3bbb19f9-6462-4797-88cf-363bc31fda70', 'Salt Abandoned Calls - 2022-10 (October)', false, null, '2023-01-06 v3 Malin+Yann' ),
 ( null, null, '5cd43a82-b007-470d-95e4-8c1bea8940f5', '5cd43a82-b007-470d-95e4-8c1bea8940f5', 'Salt Abandoned Calls - 2022-11 (November)', false, null, '2023-01-06 v3 Malin+Yann' ),
-( null, null, 'bf2ea57f-d2a9-44c1-a4fc-be2b8ecb7805', '5cd43a82-b007-470d-95e4-8c1bea8940f5', 'Salt Abandoned Calls - 2022-11 (November)', false, null, '2023-01-06 v3 Malin+Yann' ),
+( null, null, 'bf2ea57f-d2a9-44c1-a4fc-be2b8ecb7805', 'bf2ea57f-d2a9-44c1-a4fc-be2b8ecb7805', 'Salt Abandoned Calls - 2022-11 (November) - Black November', false, null, '2023-01-06 v3 Malin+Yann' ),
 -- 
 -- Newly added
 -- 
-( null, null, 'cf638f74-e941-4280-9e53-73d7f3768174', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
+( null, null, 'cf638f74-e941-4280-9e53-73d7f3768174', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, '9cc0b79b-457a-44f7-ac7a-04f088d97e40', '9cc0b79b-457a-44f7-ac7a-04f088d97e40', 'Salt Abandoned Calls - 2022-12 (December)', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, '7c66a1ab-ab6f-41a9-9cf5-f2fa26ecd9eb', '7c66a1ab-ab6f-41a9-9cf5-f2fa26ecd9eb', 'Salt Abandoned Calls - 2023-01 (January)', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, 'b6bbfe9b-f1ef-40f9-8c0d-03b762ebd577', '8a698e12-f524-4b4f-a619-774607ff2f41', 'Salt Contest - 2022-11 (November)', false, null, '2023-01-06 v3 Yann' ),
@@ -1157,11 +1241,11 @@ insert into dashboards.migration_files_mapping (sponsor_new, campaign_alt, file_
 ( null, null, 'c8fcbafa-9d95-4fad-8ab1-683b28289550', 'c8fcbafa-9d95-4fad-8ab1-683b28289550', 'Salt Up-Sell Mobile (Prepaid) - 2022-11 (November) - Recycled', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, 'e597cc6c-ecd5-4d00-9779-3d171e3a432b', 'e597cc6c-ecd5-4d00-9779-3d171e3a432b', 'Salt Up-Sell Mobile (Prepaid) - 2022-12 (December)', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, 'b330622d-b64f-4884-8053-38326308c012', 'b330622d-b64f-4884-8053-38326308c012', 'Salt Up-Sell Mobile (Prepaid) - 2023-01 (January) - Recycled 2022-10', false, null, '2023-01-06 v3 Yann' ),
-( null, null, 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
-( null, null, '3a3a4dd2-201d-4f2e-a1ea-ed0b66e4c20b', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
-( null, null, 'd5e2ac0c-18f6-4a3a-a776-efb5ea029f09', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
-( null, null, '00094746-fa8f-4012-b88d-0535794b5cf4', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
-( null, null, 'ab38fc39-4c0c-46dd-8e5d-0e109b3a167b', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Friday', false, null, '2023-01-06 v3 Yann' ),
+( null, null, 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
+( null, null, '3a3a4dd2-201d-4f2e-a1ea-ed0b66e4c20b', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
+( null, null, 'd5e2ac0c-18f6-4a3a-a776-efb5ea029f09', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
+( null, null, '00094746-fa8f-4012-b88d-0535794b5cf4', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
+( null, null, 'ab38fc39-4c0c-46dd-8e5d-0e109b3a167b', 'aa74c47f-c180-4988-a0d4-c5797f1c4ed3', 'Salt Abandoned Calls - 2022-11 (November) - Black Week', false, null, '2023-01-06 v3 Yann' ),
 ( null, null, 'f08b6e0f-0c43-4630-992c-bbbeb7ebba90', '6c330e2d-ad7e-4742-a1f4-5b50d014c31e', 'Salt Fixed Net (Fiber) - 2022-12 (December)', false, null, '2023-01-06 v3 Yann' ),
 ( 'LEGACY', null, '8929430f-4f65-4f6b-a313-b49120b2fc8b', null, null, true, null, '2023-01-06 v3 Yann' ),
 ( null, null, '1f166463-20d0-472a-a02f-1c18420fcc12', '54a5ba46-93e7-46b1-8135-a2a3cc5f3675', 'Yallo Abandoned Baskets - 2022-11 (November)', false, null, '2023-01-06 v3 Yann' ),

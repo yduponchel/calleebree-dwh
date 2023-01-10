@@ -1,6 +1,104 @@
 
 
-select * from hangup_reasons_setup;
+
+-- --------------------------------------------------------------------------------
+-- Call Hangup Reasons
+-- --------------------------------------------------------------------------------
+
+
+-- Breakdown of Call Reasons 
+select 
+	level_1_code,
+	level_2_code,
+	level_3_code,
+	count(*) as calls
+from calls 
+left join dashboards.migration_files_mapping as migration on migration.file_id = calls.file_id 
+where 1=1
+	and sponsor_id = 103
+	and migration.file_id is not null 
+	and not migration.legacy_flag 
+group by 1, 2, 3
+;
+
+-- Breakdown of Call Reasons | Adjusted for migration | Last call only!!! 
+with last_calls as (
+	select 
+		contact_id,
+		level_1_code,
+		level_2_code,
+		level_3_code,
+		rank() over (partition by contact_id order by calls.date desc) as rank
+	from calls 
+	where 1=1
+		and sponsor_id = 103
+)
+select 
+	mappings.file_name as file_name,
+	coalesce(mappings.campaign_alt, dashboards.utils_campaign_mapping(campaigns.id, campaigns.name)) as campaign_name,
+	brands.name as brand_name,
+	last_calls.level_1_code,
+	last_calls.level_2_code,
+	last_calls.level_3_code,
+	count(*)
+from last_calls 
+left join contacts on contacts.id = last_calls.contact_id 
+left join dashboards.migration_files_mapping as mappings on mappings.file_id = contacts.file_id 
+left join campaigns on campaigns.id = contacts.campaign_id 
+left join brands on brands.id = contacts.brand_id 
+where 1=1
+	and mappings.file_id is not null 
+	and not mappings.legacy_flag 
+	and rank = 1
+group by 1, 2, 3, 4, 5, 6
+order by 1, 2, 3, 7 desc
+;
+
+-- --------------------------------------------------------------------------------
+
+-- Hnagup Reasons at Contact level, including some "fix" to better reflect the real outcome
+select 
+	case 
+		when contacts.last_call_id is null and contacts.last_contacted is null then 'new' 
+		when coalesce(contacts.level_1_code, calls.level_1_code) = 'open' then 'open' 
+		when coalesce(contacts.level_1_code, calls.level_1_code) <> 'open' then 'closed' 
+		else '???' end as level_0_code,
+	case 
+		when calls.level_1_code <> 'open' then calls.level_1_code
+		else coalesce(contacts.level_1_code, calls.level_1_code) end as level_1_code,
+	case 
+		when calls.level_1_code <> 'open' then calls.level_2_code
+		else coalesce(contacts.level_2_code, calls.level_2_code) end as level_2_code,
+	case 
+		when calls.level_1_code <> 'open' then calls.level_3_code
+		else coalesce(contacts.level_3_code, calls.level_3_code) end as level_3_code,
+	calls.level_1_code as level_1_code_last_call,
+	calls.level_2_code as level_2_code_last_call,
+	calls.level_3_code as level_3_code_last_call,
+	count(*) as calls,
+	min(files.date_inserted) as date_min,
+	max(files.date_inserted) as date_max
+from contacts
+left join calls on calls.id = contacts.last_call_id 
+left join files on files.id = contacts.file_id 
+left join dashboards.migration_files_mapping as migration on migration.file_id = contacts.file_id 
+where 1=1
+	and contacts.sponsor_id = 103
+	and migration.file_id is not null 
+	and not migration.legacy_flag 
+group by 1, 2, 3, 4, 5, 6, 7
+order by 8 desc
+;
+
+
+-- --------------------------------------------------------------------------------
+
+-- Various checks
+select count(*) from contacts where last_contacted is not null and last_call_id is null;
+select count(*) from contacts where last_contacted is null and last_call_id is null;
+select count(*) from contacts where last_contacted is null and last_call_id is null and level_1_code is null;
+select count(*) from contacts where level_1_code is null;
+
 
 
 -- --------------------------------------------------------------------------------

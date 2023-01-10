@@ -111,14 +111,62 @@ where 1=0
 
 -- --------------------------------------------------------------------------------
 
+-- Missing Call Reason
+select min(date), max(date) from calls where level_1_code is null;
+select min(date), max(date) from calls where level_2_code is null;
+select min(date), max(date) from calls where level_3_code is null;
+
+
+-- Inconsistencies within Call Reasons between calls and contacts
+select 
+	contacts.level_1_code,
+	contacts.level_2_code,
+	contacts.level_3_code,
+	calls.level_1_code as level_1_code_last_call,
+	calls.level_2_code as level_2_code_last_call,
+	calls.level_3_code as level_3_code_last_call,
+	count(*) as calls,
+	min(files.date_inserted) as date_min,
+	max(files.date_inserted) as date_max
+from contacts
+left join calls on calls.id = contacts.last_call_id 
+left join files on files.id = contacts.file_id 
+where 1=1
+	and contacts.sponsor_id = 103
+	and calls.level_1_code in ('success', 'failed', 'lost')
+	and (contacts.level_2_code is null or calls.level_2_code <> contacts.level_2_code)
+group by 1, 2, 3, 4, 5, 6
+order by 7 desc
+;
+
+-- Inconsistency between Calls and Contacts: last_call does not point to the last call and the reason is therefore invalid
+select 
+	calls.id,
+	contacts.last_call_id,
+	last_calls.id,
+	calls.level_1_code,
+	contacts.level_1_code,
+	last_calls.level_1_code,
+	calls.date, 
+	contacts.last_contacted,
+	last_calls.date
+from calls
+left join contacts on contacts.id = calls.contact_id 
+left join calls as last_calls on contacts.last_call_id = last_calls.id 
+where 1=1
+	and calls.sponsor_id = 103
+	and calls.level_1_code = 'success'
+	and (contacts.last_call_id is null or contacts.last_call_id <> calls.id)
+;
+
 -- Inconsistencies between "contacts" and "calls" tables
 select 
---	sum(case when calls.id is null and contacts.last_contacted is null then 1 else 0 end) as no_last_call, 
+	sum(case when calls.id is null and contacts.last_contacted is null then 1 else 0 end) as no_last_call, 
 	sum(case when calls.id is not null and contacts.last_contacted is not null then 1 else 0 end) as matching_last_call, 
 	sum(case when calls.id is not null and contacts.last_contacted is null then 1 else 0 end) as missing_last_contacted_date, 
-	sum(case when calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call
---	sum(case when contacts.call_id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_call_id,
---	sum(case when contacts.call_id is not null and calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call
+	sum(case when calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call,
+	sum(case when contacts.last_call_id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_call_id,
+	sum(case when contacts.last_call_id is not null and calls.id is null and contacts.last_contacted is not null then 1 else 0 end) as missing_matching_call
 from contacts 
 left join calls on calls.contact_id = contacts.id 
 ;
